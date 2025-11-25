@@ -1,0 +1,53 @@
+We started from the go_to_point code and added some changes
+
+
+There are 2 subscribers for those topics:
+
+/fmu/out/vehicle_local_position
+
+/fmu/out/vehicle_attitude
+
+
+
+3 publishers for:
+
+/fmu/in/offboard_control_mode
+
+/fmu/in/trajectory_setpoint
+
+/fmu/in/vehicle_command
+
+
+2 timers:
+(100ms) activates the offboard
+(20ms) publishes the setpoint for the trajectory
+
+
+
+The prepare_trajectory() function computes the distance between the waypoints to compute the duration of each segment.
+For each middle waypoint we impose the velocities and accelerations to make the trajectory smooth. 
+Velocities are computed as the average between the velocity in the previous segment and the next one while the accelerations are set to zero.
+For the first and last trajectory point the velocity is set to zero.
+
+
+In the compute_quintic_coeffs(...) function we compute the 6 coefficients for the quintic polynomial so that we can impose both velocities and accelerations at the beginning and the end of each segment.
+
+
+The publish_trajectory_setpoint() function checks if you received the waypoints and if the trajectory is ready. Then it increases the global_time and derives in which segment we are so that it can evaluate the quintic polynomials for position, velocity and acceleration (using the eval_quintic(...) function).
+Eventually it creates a message TrajectorySetpoint and it publishes it
+
+
+When the node starts it asks for the waypoints and duration. If the format is not correct it will execute a default trajectory. 
+Here is an example:
+
+9
+0 0 10 0
+10 -10 10 0.1
+25 -15 10 0.2
+30 -5 10 0.3
+25 0 10 0.7
+30 10 10 0.3
+25 15 10 0.2
+10 10 10 0.1
+0 0 10 0
+30
