@@ -308,18 +308,20 @@ private:
                 double navg = dir_avg.norm();
                 if (navg > 1e-6) {
                     dir_avg /= navg;
-                    double local_speed = base_speed * (0.8 + 0.4 * ( (n_in + n_out) / 2.0 )); // scale speed with segment lengths
-                    vels[i].head<3>() = dir_avg * local_speed;
+                    double prev_speed =  (waypoints_[i].xyzyaw.head<3>() - waypoints_[i-1].xyzyaw.head<3>()).norm()/segment_times_[i-1];
+                    double post_speed =  (waypoints_[i+1].xyzyaw.head<3>() - waypoints_[i].xyzyaw.head<3>()).norm()/segment_times_[i];
+                    double avg_speed = 0.5 * (prev_speed + post_speed);
+                    vels[i].head<3>() = dir_avg * avg_speed;
                 } else {
-                    // turn in place: small tangential speed along outgoing
                     vels[i].head<3>() = dir_out * (base_speed * 0.5);
+                    RCLCPP_ERROR(this->get_logger(), "navg piccolo");
                 }
                 // yaw rate: average of incoming/outgoing yaw rates
                 double yaw_in = utilities::angleError(waypoints_[i].xyzyaw(3), waypoints_[i-1].xyzyaw(3)) / segment_times_[i-1];
                 double yaw_out = utilities::angleError(waypoints_[i+1].xyzyaw(3), waypoints_[i].xyzyaw(3)) / segment_times_[i];
                 //vels = 0.5*(yaw_in + yaw_out);
                 Eigen::Vector4d vel_vec;
-		vel_vec << 0.0, 0.0, 0.0, 0.5*(yaw_in + yaw_out);
+		vel_vec << vels[i].x(), vels[i].y(), vels[i].z(), 0.5*(yaw_in + yaw_out);
 		vels[i] = vel_vec;
 
             }
@@ -344,8 +346,7 @@ private:
             Eigen::Vector4d af = accs[seg+1];
 
             std::array<QuinticCoeffs,4> coeffs_xyzyaw;
-            // compute separate quintic for x,y,z and yaw (yaw must respect angle wrapping)
-            // for yaw, handle angle difference properly: convert end yaw to start frame
+
             for (int axis=0; axis<4; ++axis) {
                 double p0_axis = p0(axis);
                 double pf_axis = pf(axis);
