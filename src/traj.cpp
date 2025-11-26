@@ -313,8 +313,7 @@ private:
                     double avg_speed = 0.5 * (prev_speed + post_speed);
                     vels[i].head<3>() = dir_avg * avg_speed;
                 } else {
-                    vels[i].head<3>() = dir_out * (base_speed * 0.5);
-                    RCLCPP_ERROR(this->get_logger(), "navg piccolo");
+                    vels[i].head<3>() = dir_out * (base_speed * 0.5);          
                 }
                 // yaw rate: average of incoming/outgoing yaw rates
                 double yaw_in = utilities::angleError(waypoints_[i].xyzyaw(3), waypoints_[i-1].xyzyaw(3)) / segment_times_[i-1];

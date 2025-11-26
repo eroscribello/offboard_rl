@@ -25,8 +25,33 @@ There are 2 subscribers for those topics:
 
 
 The prepare_trajectory() function computes the distance between the waypoints to compute the duration of each segment.
+
+for (size_t i=0;i<dists.size();i++) {
+            double segT = (dists[i] / total_dist) * total_T;
+            if (segT < 0.5) segT = 0.5; // min duration per segment
+            segment_times_.push_back(segT);
+        }
+        
 For each middle waypoint we impose the velocities and accelerations to make the trajectory smooth. 
 Velocities are computed as the average between the velocity in the previous segment and the next one while the accelerations are set to zero.
+
+
+Eigen::Vector3d dir_in = (waypoints_[i].xyzyaw.head<3>() - waypoints_[i-1].xyzyaw.head<3>());
+                Eigen::Vector3d dir_out = (waypoints_[i+1].xyzyaw.head<3>() - waypoints_[i].xyzyaw.head<3>());
+double n_in = dir_in.norm();
+double n_out = dir_out.norm();
+
+Eigen::Vector3d dir_avg = dir_in + dir_out;
+double navg = dir_avg.norm();
+
+...
+
+dir_avg /= navg;
+double prev_speed =  (waypoints_[i].xyzyaw.head<3>() - waypoints_[i-1].xyzyaw.head<3>()).norm()/segment_times_[i-1];
+double post_speed =  (waypoints_[i+1].xyzyaw.head<3>() - waypoints_[i].xyzyaw.head<3>()).norm()/segment_times_[i];
+double avg_speed = 0.5 * (prev_speed + post_speed);
+vels[i].head<3>() = dir_avg * avg_speed;
+
 For the first and last trajectory point the velocity is set to zero.
 
 
@@ -34,8 +59,20 @@ In the compute_quintic_coeffs(...) function we compute the 6 coefficients for th
 
 
 The publish_trajectory_setpoint() function checks if you received the waypoints and if the trajectory is ready. Then it increases the global_time and derives in which segment we are so that it can evaluate the quintic polynomials for position, velocity and acceleration (using the eval_quintic(...) function).
+
+eval_quintic(segment_coeffs_[seg][0].a, local_t, px, vx, ax);
+eval_quintic(segment_coeffs_[seg][1].a, local_t, py, vy, ay);
+eval_quintic(segment_coeffs_[seg][2].a, local_t, pz, vz, az);
+eval_quintic(segment_coeffs_[seg][3].a, local_t, pyaw, vyaw, ayay);
+
+
 Eventually it creates a message TrajectorySetpoint and it publishes it
 
+TrajectorySetpoint msg{};
+msg.position = {float(px), float(py), float(pz)};
+msg.velocity = {float(vx), float(vy), float(vz)};
+msg.acceleration = {float(ax), float(ay), float(az)};
+msg.yaw = float(yaw_norm);
 
 When the node starts it asks for the waypoints and duration. If the format is not correct it will execute a default trajectory. 
 Here is an example:
